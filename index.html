@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unicode Character Viewer & Cleaner</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 30px;
+        }
+        .container {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        textarea {
+            width: 100%;
+            min-height: 150px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            margin-bottom: 15px;
+            resize: vertical;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button.clean {
+            background-color: #27ae60;
+        }
+        button.clean:hover {
+            background-color: #219653;
+        }
+        button.copy {
+            background-color: #7f8c8d;
+        }
+        button.copy:hover {
+            background-color: #6c7a7d;
+        }
+        .output-container {
+            margin-top: 30px;
+        }
+        #char-display {
+            max-height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            background-color: #f9f9f9;
+            margin-top: 10px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        tr:nth-child(even) {
+            background-color: #f5f5f5;
+        }
+        .highlight {
+            background-color: #ffecb3;
+            padding: 2px 4px;
+            border-radius: 2px;
+        }
+        .info-box {
+            background-color: #e8f4f8;
+            border-left: 4px solid #3498db;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 0 4px 4px 0;
+        }
+        .copy-notification {
+            display: none;
+            background-color: #2ecc71;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 4px;
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            animation: fadeIn 0.3s, fadeOut 0.3s 1.7s;
+            z-index: 100;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+        .character-cell {
+            font-family: monospace;
+            padding: 4px 8px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Unicode Character Viewer & Cleaner</h1>
+        
+        <div class="info-box">
+            <p>This tool helps you identify and remove invisible or non-printable Unicode characters from text. Paste your text below to see a breakdown of any special characters. The clean function preserves basic formatting like line breaks, tabs, bold, and italics.</p>
+        </div>
+        
+        <textarea id="input-text" placeholder="Paste your text here..." spellcheck="false"></textarea>
+        
+        <div class="button-group">
+            <button id="analyze-btn">Analyze Text</button>
+            <button id="clean-btn" class="clean">Clean Text</button>
+            <button id="copy-btn" class="copy">Copy Cleaned Text</button>
+        </div>
+        
+        <div class="output-container">
+            <h2>Special Character Analysis</h2>
+            <p>Total characters: <span id="char-count">0</span></p>
+            <div id="char-display">
+                <table id="char-table">
+                    <thead>
+                        <tr>
+                            <th>Position</th>
+                            <th>Symbol</th>
+                            <th>Unicode</th>
+                            <th>Description</th>
+                            <th>Category</th>
+                        </tr>
+                    </thead>
+                    <tbody id="char-tbody">
+                        <!-- Special characters will be inserted here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="copy-notification" class="copy-notification">
+        Text copied to clipboard!
+    </div>
+
+    <script>
+        // Character information database
+        const characterInfo = {
+            // Common control characters
+            '\u0000': { name: 'NULL', desc: 'Null character' },
+            '\u0001': { name: 'SOH', desc: 'Start of Heading' },
+            '\u0002': { name: 'STX', desc: 'Start of Text' },
+            '\u0003': { name: 'ETX', desc: 'End of Text' },
+            '\u0004': { name: 'EOT', desc: 'End of Transmission' },
+            '\u0005': { name: 'ENQ', desc: 'Enquiry' },
+            '\u0006': { name: 'ACK', desc: 'Acknowledge' },
+            '\u0007': { name: 'BEL', desc: 'Bell' },
+            '\u0008': { name: 'BS', desc: 'Backspace' },
+            '\u0009': { name: 'HT', desc: 'Horizontal Tab' },
+            '\u000A': { name: 'LF', desc: 'Line Feed' },
+            '\u000B': { name: 'VT', desc: 'Vertical Tab' },
+            '\u000C': { name: 'FF', desc: 'Form Feed' },
+            '\u000D': { name: 'CR', desc: 'Carriage Return' },
+            '\u000E': { name: 'SO', desc: 'Shift Out' },
+            '\u000F': { name: 'SI', desc: 'Shift In' },
+            '\u0010': { name: 'DLE', desc: 'Data Link Escape' },
+            '\u0011': { name: 'DC1', desc: 'Device Control 1' },
+            '\u0012': { name: 'DC2', desc: 'Device Control 2' },
+            '\u0013': { name: 'DC3', desc: 'Device Control 3' },
+            '\u0014': { name: 'DC4', desc: 'Device Control 4' },
+            '\u0015': { name: 'NAK', desc: 'Negative Acknowledge' },
+            '\u0016': { name: 'SYN', desc: 'Synchronous Idle' },
+            '\u0017': { name: 'ETB', desc: 'End of Transmission Block' },
+            '\u0018': { name: 'CAN', desc: 'Cancel' },
+            '\u0019': { name: 'EM', desc: 'End of Medium' },
+            '\u001A': { name: 'SUB', desc: 'Substitute' },
+            '\u001B': { name: 'ESC', desc: 'Escape' },
+            '\u001C': { name: 'FS', desc: 'File Separator' },
+            '\u001D': { name: 'GS', desc: 'Group Separator' },
+            '\u001E': { name: 'RS', desc: 'Record Separator' },
+            '\u001F': { name: 'US', desc: 'Unit Separator' },
+            '\u007F': { name: 'DEL', desc: 'Delete' },
+            
+            // Common invisible/special unicode characters
+            '\u00A0': { name: 'NBSP', desc: 'Non-Breaking Space' },
+            '\u00AD': { name: 'SHY', desc: 'Soft Hyphen' },
+            '\u061C': { name: 'ALM', desc: 'Arabic Letter Mark' },
+            '\u180E': { name: 'MVS', desc: 'Mongolian Vowel Separator' },
+            '\u2000': { name: 'NQSP', desc: 'En Quad' },
+            '\u2001': { name: 'MQSP', desc: 'Em Quad' },
+            '\u2002': { name: 'ENSP', desc: 'En Space' },
+            '\u2003': { name: 'EMSP', desc: 'Em Space' },
+            '\u2004': { name: '3/MSP', desc: 'Three-Per-Em Space' },
+            '\u2005': { name: '4/MSP', desc: 'Four-Per-Em Space' },
+            '\u2006': { name: '6/MSP', desc: 'Six-Per-Em Space' },
+            '\u2007': { name: 'FSP', desc: 'Figure Space' },
+            '\u2008': { name: 'PSP', desc: 'Punctuation Space' },
+            '\u2009': { name: 'THSP', desc: 'Thin Space' },
+            '\u200A': { name: 'HSP', desc: 'Hair Space' },
+            '\u200B': { name: 'ZWSP', desc: 'Zero Width Space' },
+            '\u200C': { name: 'ZWNJ', desc: 'Zero Width Non-Joiner' },
+            '\u200D': { name: 'ZWJ', desc: 'Zero Width Joiner' },
+            '\u200E': { name: 'LRM', desc: 'Left-to-Right Mark' },
+            '\u200F': { name: 'RLM', desc: 'Right-to-Left Mark' },
+            '\u202A': { name: 'LRE', desc: 'Left-to-Right Embedding' },
+            '\u202B': { name: 'RLE', desc: 'Right-to-Left Embedding' },
+            '\u202C': { name: 'PDF', desc: 'Pop Directional Formatting' },
+            '\u202D': { name: 'LRO', desc: 'Left-to-Right Override' },
+            '\u202E': { name: 'RLO', desc: 'Right-to-Left Override' },
+            '\u202F': { name: 'NNBSP', desc: 'Narrow No-Break Space' },
+            '\u205F': { name: 'MMSP', desc: 'Medium Mathematical Space' },
+            '\u2060': { name: 'WJ', desc: 'Word Joiner' },
+            '\u2061': { name: 'FA', desc: 'Function Application' },
+            '\u2062': { name: 'IT', desc: 'Invisible Times' },
+            '\u2063': { name: 'IS', desc: 'Invisible Separator' },
+            '\u2064': { name: 'IP', desc: 'Invisible Plus' },
+            '\u2066': { name: 'LRI', desc: 'Left-to-Right Isolate' },
+            '\u2067': { name: 'RLI', desc: 'Right-to-Left Isolate' },
+            '\u2068': { name: 'FSI', desc: 'First Strong Isolate' },
+            '\u2069': { name: 'PDI', desc: 'Pop Directional Isolate' },
+            '\u206A': { name: 'ISS', desc: 'Inhibit Symmetric Swapping' },
+            '\u206B': { name: 'ASS', desc: 'Activate Symmetric Swapping' },
+            '\u206C': { name: 'IAFS', desc: 'Inhibit Arabic Form Shaping' },
+            '\u206D': { name: 'AAFS', desc: 'Activate Arabic Form Shaping' },
+            '\u206E': { name: 'NADS', desc: 'National Digit Shapes' },
+            '\u206F': { name: 'NODS', desc: 'Nominal Digit Shapes' },
+            '\u3000': { name: 'IDSP', desc: 'Ideographic Space' },
+            '\uFEFF': { name: 'BOM', desc: 'Byte Order Mark' },
+            '\uFFF9': { name: 'IAA', desc: 'Interlinear Annotation Anchor' },
+            '\uFFFA': { name: 'IAS', desc: 'Interlinear Annotation Separator' },
+            '\uFFFB': { name: 'IAT', desc: 'Interlinear Annotation Terminator' },
+        };
+
+        // Unicode character categories
+        const categories = {
+            'Lu': 'Uppercase Letter',
+            'Ll': 'Lowercase Letter',
+            'Lt': 'Titlecase Letter',
+            'Lm': 'Modifier Letter',
+            'Lo': 'Other Letter',
+            'Mn': 'Non-spacing Mark',
+            'Mc': 'Spacing Mark',
+            'Me': 'Enclosing Mark',
+            'Nd': 'Decimal Number',
+            'Nl': 'Letter Number',
+            'No': 'Other Number',
+            'Pc': 'Connector Punctuation',
+            'Pd': 'Dash Punctuation',
+            'Ps': 'Open Punctuation',
+            'Pe': 'Close Punctuation',
+            'Pi': 'Initial Punctuation',
+            'Pf': 'Final Punctuation',
+            'Po': 'Other Punctuation',
+            'Sm': 'Math Symbol',
+            'Sc': 'Currency Symbol',
+            'Sk': 'Modifier Symbol',
+            'So': 'Other Symbol',
+            'Zs': 'Space Separator',
+            'Zl': 'Line Separator',
+            'Zp': 'Paragraph Separator',
+            'Cc': 'Control',
+            'Cf': 'Format',
+            'Cs': 'Surrogate',
+            'Co': 'Private Use',
+            'Cn': 'Unassigned'
+        };
+
+        // Simplified category detection
+        function getCharCategory(char) {
+            const code = char.codePointAt(0);
+            
+            // Control characters
+            if (code < 32 || code === 127) {
+                return 'Cc';
+            }
+            
+            // Common format characters
+            if ((code >= 0x200B && code <= 0x200F) || 
+                (code >= 0x202A && code <= 0x202E) ||
+                (code >= 0x2060 && code <= 0x2069) ||
+                (code >= 0x206A && code <= 0x206F) ||
+                code === 0xFEFF) {
+                return 'Cf';
+            }
+            
+            // Space separators
+            if (code === 0x20 || code === 0xA0 || 
+                (code >= 0x2000 && code <= 0x200A) ||
+                code === 0x202F || code === 0x205F || code === 0x3000) {
+                return 'Zs';
+            }
+            
+            // Line/paragraph separators
+            if (code === 0x2028) return 'Zl';
+            if (code === 0x2029) return 'Zp';
+            
+            // Best guess for other characters
+            if ((code >= 0x41 && code <= 0x5A) || 
+                (code >= 0xC0 && code <= 0xD6) || 
+                (code >= 0xD8 && code <= 0xDE)) {
+                return 'Lu'; // Basic Latin uppercase
+            }
+            
+            if ((code >= 0x61 && code <= 0x7A) || 
+                (code >= 0xDF && code <= 0xF6) || 
+                (code >= 0xF8 && code <= 0xFF)) {
+                return 'Ll'; // Basic Latin lowercase
+            }
+            
+            if (code >= 0x30 && code <= 0x39) {
+                return 'Nd'; // Digits
+            }
+            
+            if ((code >= 0x21 && code <= 0x2F) || 
+                (code >= 0x3A && code <= 0x40) ||
+                (code >= 0x5B && code <= 0x60) ||
+                (code >= 0x7B && code <= 0x7E)) {
+                return 'Po'; // Basic punctuation
+            }
+            
+            // Default for other characters
+            return 'Lo';
+        }
+
+        // Function to analyze text and display character information
+        function analyzeText() {
+            const text = document.getElementById('input-text').value;
+            const tbody = document.getElementById('char-tbody');
+            const charCount = document.getElementById('char-count');
+            
+            // Clear previous results
+            tbody.innerHTML = '';
+            charCount.textContent = text.length;
+            
+            // Track special characters found
+            let specialCharFound = false;
+            
+            // Parse each character
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const code = char.codePointAt(0);
+                const hexCode = 'U+' + code.toString(16).toUpperCase().padStart(4, '0');
+                const category = getCharCategory(char);
+                
+                // Determine if this is a special character
+                const isSpecial = code < 32 || code === 127 || 
+                                 (code >= 0x80 && code <= 0x9F) ||
+                                 category === 'Cf' || category === 'Zs' && code !== 0x20 || // Exclude regular space
+                                 category === 'Zl' || category === 'Zp';
+                
+                // Only show special characters in the table
+                if (!isSpecial) continue;
+                
+                specialCharFound = true;
+                
+                // Create table row
+                const row = document.createElement('tr');
+                row.classList.add('highlight');
+                
+                // Position cell
+                const posCell = document.createElement('td');
+                posCell.textContent = i;
+                row.appendChild(posCell);
+                
+                // Character cell - use placeholder for invisible characters
+                const charCell = document.createElement('td');
+                charCell.classList.add('character-cell');
+                charCell.textContent = '␣'; // Placeholder symbol
+                charCell.title = 'Invisible or control character';
+                row.appendChild(charCell);
+                
+                // Unicode code point cell
+                const codeCell = document.createElement('td');
+                codeCell.textContent = hexCode;
+                row.appendChild(codeCell);
+                
+                // Description cell
+                const descCell = document.createElement('td');
+                const info = characterInfo[char];
+                if (info) {
+                    descCell.textContent = `${info.name}: ${info.desc}`;
+                } else {
+                    descCell.textContent = 'Special character';
+                }
+                row.appendChild(descCell);
+                
+                // Category cell
+                const catCell = document.createElement('td');
+                catCell.textContent = categories[category] || category;
+                row.appendChild(catCell);
+                
+                // Add row to table
+                tbody.appendChild(row);
+            }
+            
+            // Add a message if no special characters were found
+            if (!specialCharFound) {
+                const row = document.createElement('tr');
+                const cell = document.createElement('td');
+                cell.colSpan = 5;
+                cell.textContent = 'No invisible or special characters found in the text.';
+                cell.style.textAlign = 'center';
+                cell.style.padding = '20px';
+                row.appendChild(cell);
+                tbody.appendChild(row);
+            }
+        }
+
+        // Function to clean text by removing invisible characters but preserving basic formatting
+        function cleanText() {
+            const text = document.getElementById('input-text').value;
+            
+            // Define replacements that preserve formatting
+            const cleaned = text
+                // Remove most invisible and problematic characters
+                .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00AD\u061C\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2069\u206A-\u206F\uFEFF\uFFF9-\uFFFB]/g, '')
+                // Replace various spaces with regular space while keeping tabs
+                .replace(/[\u00A0\u2000-\u200A\u202F\u205F\u3000]/g, ' ')
+                // Keep line breaks (CR, LF, CR+LF) and tabs
+                // Replace multiple spaces with single space (but keep tabs and line breaks)
+                .replace(/[ ]{2,}/g, ' ');
+            
+            // Update text area with cleaned text
+            document.getElementById('input-text').value = cleaned;
+            
+            // Re-analyze the cleaned text
+            analyzeText();
+        }
+
+        // Function to copy cleaned text to clipboard
+        function copyCleanedText() {
+            const textArea = document.getElementById('input-text');
+            
+            // Select the text
+            textArea.select();
+            textArea.setSelectionRange(0, 99999); // For mobile devices
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textArea.value).then(() => {
+                // Show notification
+                const notification = document.getElementById('copy-notification');
+                notification.style.display = 'block';
+                
+                // Hide notification after 2 seconds
+                setTimeout(() => {
+                    notification.style.display = 'none';
+                }, 2000);
+            });
+        }
+
+        // Set up event listeners
+        document.getElementById('analyze-btn').addEventListener('click', analyzeText);
+        document.getElementById('clean-btn').addEventListener('click', cleanText);
+        document.getElementById('copy-btn').addEventListener('click', copyCleanedText);
+        
+        // Initialize with empty analysis
+        analyzeText();
+    </script>
+</body>
+</html>
