@@ -136,7 +136,7 @@
         <h1>Unicode Character Viewer & Cleaner</h1>
         
         <div class="info-box">
-            <p>This tool helps you identify and remove invisible or non-printable Unicode characters from text. Paste your text below to see a breakdown of any special characters. The clean function preserves basic formatting like line breaks, tabs, bold, and italics.</p>
+            <p>This tool helps you identify and remove invisible or non-printable Unicode characters from text. Paste your text below to see a breakdown of any special characters. Regular spaces and line feeds (new lines) are considered normal and won't be listed. The clean function preserves basic formatting like line breaks, tabs, bold, and italics.</p>
         </div>
         
         <textarea id="input-text" placeholder="Paste your text here..." spellcheck="false"></textarea>
@@ -373,9 +373,11 @@
                 const category = getCharCategory(char);
                 
                 // Determine if this is a special character
-                const isSpecial = code < 32 || code === 127 || 
+                const isSpecial = (code < 32 && code !== 0x0A) || // Exclude LF (Line Feed)
+                                 code === 127 || 
                                  (code >= 0x80 && code <= 0x9F) ||
-                                 category === 'Cf' || category === 'Zs' && code !== 0x20 || // Exclude regular space
+                                 category === 'Cf' || 
+                                 (category === 'Zs' && code !== 0x20) || // Exclude regular space
                                  category === 'Zl' || category === 'Zp';
                 
                 // Only show special characters in the table
